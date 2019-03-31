@@ -495,6 +495,18 @@ const (
 	// assigned from. Used with CNI chaining where IPs are not directly managed
 	// by Cilium.
 	IPv6PodSubnets = "ipv6-pod-subnets"
+
+	// IdentityAllocationMode specifies what mode to use for identity
+	// allocation
+	IdentityAllocationMode = "identity-allocation-mode"
+
+	// IdentityAllocationModeKVstore enables use of a key-value store such
+	// as etcd or consul for identity allocation
+	IdentityAllocationModeKVstore = "kvstore"
+
+	// IdentityAllocationModeCRD enables use of Kubernetes CRDs for
+	// identity allocation
+	IdentityAllocationModeCRD = "crd"
 )
 
 // FQDNS variables
@@ -1000,6 +1012,10 @@ type DaemonConfig struct {
 
 	// IPv6PodSubnets available subnets to be assign IPv6 addresses to pods from
 	IPv6PodSubnets []*net.IPNet
+
+	// IdentityAllocationMode specifies what mode to use for identity
+	// allocation
+	IdentityAllocationMode string
 }
 
 var (
@@ -1027,6 +1043,7 @@ var (
 		ForceLocalPolicyEvalAtSource: defaults.ForceLocalPolicyEvalAtSource,
 		EnableEndpointRoutes:         defaults.EnableEndpointRoutes,
 		AnnotateK8sNode:              defaults.AnnotateK8sNode,
+		IdentityAllocationMode:       IdentityAllocationModeKVstore,
 	}
 )
 
@@ -1308,6 +1325,7 @@ func (c *DaemonConfig) Populate() {
 	c.HTTPRetryCount = viper.GetInt(HTTPRetryCount)
 	c.HTTPRetryTimeout = viper.GetInt(HTTPRetryTimeout)
 	c.IPv4ClusterCIDRMaskSize = viper.GetInt(IPv4ClusterCIDRMaskSize)
+	c.IdentityAllocationMode = viper.GetString(IdentityAllocationMode)
 	c.IdentityChangeGracePeriod = viper.GetDuration(IdentityChangeGracePeriod)
 	c.IPv4Range = viper.GetString(IPv4Range)
 	c.IPv4NodeAddr = viper.GetString(IPv4NodeAddr)
