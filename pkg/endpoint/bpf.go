@@ -915,7 +915,7 @@ func (e *Endpoint) deletePolicyKey(keyToDelete policy.Key, incremental bool) err
 
 	err := e.PolicyMap.DeleteKey(policymapKey)
 	if err != nil {
-		e.getLogger().WithError(err).Errorf("Failed to delete PolicyMap key %s", policymapKey.String())
+		e.getLogger().WithError(err).WithField(logfields.BPFMapKey, policymapKey).Error("Failed to delete PolicyMap key")
 		return err
 	}
 
@@ -941,7 +941,10 @@ func (e *Endpoint) addPolicyKey(keyToAdd policy.Key, entry policy.MapStateEntry,
 
 	err := e.PolicyMap.AllowKey(policymapKey, entry.ProxyPort)
 	if err != nil {
-		e.getLogger().WithError(err).Errorf("Failed to add PolicyMap key %s %d", policymapKey.String(), entry.ProxyPort)
+		e.getLogger().WithError(err).WithFields(logrus.Fields{
+			logfields.BPFMapKey: policymapKey,
+			logfields.Port:      entry.ProxyPort,
+		}).Error("Failed to add PolicyMap key")
 		return err
 	}
 
@@ -992,7 +995,10 @@ func (e *Endpoint) applyPolicyMapChanges() error {
 	if len(errors) > 0 {
 		return fmt.Errorf("updating desired PolicyMap state failed: %s", errors)
 	} else if len(adds)+len(deletes) > 0 {
-		e.getLogger().Debugf("Applied policy updates due to added identities: %v, deleted identities: %v", adds, deletes)
+		e.getLogger().WithFields(logrus.Fields{
+			logfields.AddedPolicyID:   adds,
+			logfields.DeletedPolicyID: deletes,
+		}).Debug("Applied policy map updates due identity changes")
 	}
 
 	return nil
