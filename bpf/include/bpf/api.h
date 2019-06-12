@@ -202,6 +202,10 @@ static int BPF_FUNC(sock_map_update, struct bpf_sock_ops *skops, void *map, uint
 static int BPF_FUNC(sock_hash_update, struct bpf_sock_ops *skops, void *map, void *key,  uint64_t flags);
 static int BPF_FUNC(msg_redirect_hash, struct sk_msg_md *md, void *map, void *key, uint64_t flags);
 
+
+static int BPF_FUNC(fib_lookup, struct __sk_buff * skb,
+		   struct bpf_fib_lookup *params, int plen, uint32_t flags);
+
 /** LLVM built-ins, mem*() routines work for constant size */
 
 #ifndef lock_xadd
