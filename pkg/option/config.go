@@ -204,6 +204,9 @@ const (
 	// LB enables load balancer mode where load balancer bpf program is attached to the given interface
 	LB = "lb"
 
+	// EnableNodePort enables NodePort services implemented by Cilium in BPF
+	EnableNodePort = "enable-node-port"
+
 	// LibDir enables the directory path to store runtime build environment
 	LibDir = "lib-dir"
 
@@ -980,6 +983,9 @@ type DaemonConfig struct {
 	// configuration to Cilium.
 	ReadCNIConfiguration string
 
+	// EnableNodePort enables k8s NodePort service implementation in BPF
+	EnableNodePort bool
+
 	// excludeLocalAddresses excludes certain addresses to be recognized as
 	// a local address
 	excludeLocalAddresses []*net.IPNet
@@ -1274,6 +1280,7 @@ func (c *DaemonConfig) Populate() {
 	c.EnableHealthChecking = viper.GetBool(EnableHealthChecking)
 	c.EnablePolicy = strings.ToLower(viper.GetString(EnablePolicy))
 	c.EnableTracing = viper.GetBool(EnableTracing)
+	c.EnableNodePort = viper.GetBool(EnableNodePort)
 	c.EncryptInterface = viper.GetString(EncryptInterface)
 	c.EncryptNode = viper.GetBool(EncryptNode)
 	c.EnvoyLogPath = viper.GetString(EnvoyLog)

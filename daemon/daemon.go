@@ -112,6 +112,7 @@ const (
 	initArgHostReachableServices
 	initArgCgroupRoot
 	initArgBpffsRoot
+	initArgNodePort
 	initArgMax
 )
 
@@ -532,6 +533,10 @@ func (d *Daemon) compileBase() error {
 			args[initArgMode] = "flannel"
 			args[initArgDevice] = option.Config.FlannelMasterDevice
 		}
+	}
+
+	if option.Config.EnableNodePort {
+		args[initArgNodePort] = "true"
 	}
 
 	prog := filepath.Join(option.Config.BpfDir, "init.sh")
