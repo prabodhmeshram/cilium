@@ -15,27 +15,22 @@ import (
 	strfmt "github.com/go-openapi/strfmt"
 )
 
-// NewGetHealthzParams creates a new GetHealthzParams object
+// NewGetClusterNodesParams creates a new GetClusterNodesParams object
 // no default values defined in spec.
-func NewGetHealthzParams() GetHealthzParams {
+func NewGetClusterNodesParams() GetClusterNodesParams {
 
-	return GetHealthzParams{}
+	return GetClusterNodesParams{}
 }
 
-// GetHealthzParams contains all the bound params for the get healthz operation
+// GetClusterNodesParams contains all the bound params for the get cluster nodes operation
 // typically these are obtained from a http.Request
 //
-// swagger:parameters GetHealthz
-type GetHealthzParams struct {
+// swagger:parameters GetClusterNodes
+type GetClusterNodesParams struct {
 
 	// HTTP Request Object
 	HTTPRequest *http.Request `json:"-"`
 
-	/*Brief will return a brief representation of the Cilium status.
-
-	  In: header
-	*/
-	Brief *bool
 	/*Client UUID that should be used to request new
 
 	  In: header
@@ -46,15 +41,11 @@ type GetHealthzParams struct {
 // BindRequest both binds and validates a request, it assumes that complex things implement a Validatable(strfmt.Registry) error interface
 // for simple values it will use straight method calls.
 //
-// To ensure default values, the struct must have been initialized with NewGetHealthzParams() beforehand.
-func (o *GetHealthzParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
+// To ensure default values, the struct must have been initialized with NewGetClusterNodesParams() beforehand.
+func (o *GetClusterNodesParams) BindRequest(r *http.Request, route *middleware.MatchedRoute) error {
 	var res []error
 
 	o.HTTPRequest = r
-
-	if err := o.bindBrief(r.Header[http.CanonicalHeaderKey("brief")], true, route.Formats); err != nil {
-		res = append(res, err)
-	}
 
 	if err := o.bindClientID(r.Header[http.CanonicalHeaderKey("client-id")], true, route.Formats); err != nil {
 		res = append(res, err)
@@ -66,30 +57,8 @@ func (o *GetHealthzParams) BindRequest(r *http.Request, route *middleware.Matche
 	return nil
 }
 
-// bindBrief binds and validates parameter Brief from header.
-func (o *GetHealthzParams) bindBrief(rawData []string, hasKey bool, formats strfmt.Registry) error {
-	var raw string
-	if len(rawData) > 0 {
-		raw = rawData[len(rawData)-1]
-	}
-
-	// Required: false
-
-	if raw == "" { // empty values pass all other validations
-		return nil
-	}
-
-	value, err := swag.ConvertBool(raw)
-	if err != nil {
-		return errors.InvalidType("brief", "header", "bool", raw)
-	}
-	o.Brief = &value
-
-	return nil
-}
-
 // bindClientID binds and validates parameter ClientID from header.
-func (o *GetHealthzParams) bindClientID(rawData []string, hasKey bool, formats strfmt.Registry) error {
+func (o *GetClusterNodesParams) bindClientID(rawData []string, hasKey bool, formats strfmt.Registry) error {
 	var raw string
 	if len(rawData) > 0 {
 		raw = rawData[len(rawData)-1]

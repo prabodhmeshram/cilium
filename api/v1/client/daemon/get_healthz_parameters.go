@@ -68,6 +68,12 @@ type GetHealthzParams struct {
 
 	*/
 	Brief *bool
+	/*ClientID
+	  Client UUID that should be used to request new
+
+
+	*/
+	ClientID *int64
 
 	timeout    time.Duration
 	Context    context.Context
@@ -118,6 +124,17 @@ func (o *GetHealthzParams) SetBrief(brief *bool) {
 	o.Brief = brief
 }
 
+// WithClientID adds the clientID to the get healthz params
+func (o *GetHealthzParams) WithClientID(clientID *int64) *GetHealthzParams {
+	o.SetClientID(clientID)
+	return o
+}
+
+// SetClientID adds the clientId to the get healthz params
+func (o *GetHealthzParams) SetClientID(clientID *int64) {
+	o.ClientID = clientID
+}
+
 // WriteToRequest writes these params to a swagger request
 func (o *GetHealthzParams) WriteToRequest(r runtime.ClientRequest, reg strfmt.Registry) error {
 
@@ -130,6 +147,15 @@ func (o *GetHealthzParams) WriteToRequest(r runtime.ClientRequest, reg strfmt.Re
 
 		// header param brief
 		if err := r.SetHeaderParam("brief", swag.FormatBool(*o.Brief)); err != nil {
+			return err
+		}
+
+	}
+
+	if o.ClientID != nil {
+
+		// header param client-id
+		if err := r.SetHeaderParam("client-id", swag.FormatInt64(*o.ClientID)); err != nil {
 			return err
 		}
 
