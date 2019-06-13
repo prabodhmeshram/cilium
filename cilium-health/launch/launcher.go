@@ -1,4 +1,4 @@
-// Copyright 2017 Authors of Cilium
+// Copyright 2017-2019 Authors of Cilium
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ func (ch *CiliumHealth) Run() {
 	for {
 		cli, err := ciliumPkg.NewDefaultClient()
 		if err == nil {
-			if _, err = cli.Daemon.GetHealthz(nil); err == nil {
+			if _, err = cli.Daemon.GetClusterNodes(nil); err == nil {
 				break
 			}
 		}
