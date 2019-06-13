@@ -17,16 +17,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/cilium/cilium/api/v1/models"
 	. "github.com/cilium/cilium/api/v1/server/restapi/daemon"
 	"github.com/cilium/cilium/pkg/backoff"
 	"github.com/cilium/cilium/pkg/controller"
+	"github.com/cilium/cilium/pkg/datapath"
 	"github.com/cilium/cilium/pkg/k8s"
 	k8smetrics "github.com/cilium/cilium/pkg/k8s/metrics"
 	"github.com/cilium/cilium/pkg/kvstore"
 	"github.com/cilium/cilium/pkg/lock"
+	"github.com/cilium/cilium/pkg/node"
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/status"
 	"github.com/cilium/cilium/pkg/workloads"
@@ -134,6 +137,109 @@ func (h *getHealthz) Handle(params GetHealthzParams) middleware.Responder {
 	sr := h.daemon.getStatus(brief)
 
 	return NewGetHealthzOK().WithPayload(&sr)
+}
+
+type getNodes struct {
+	d *Daemon
+	lock.RWMutex
+	clients map[int64]*clusterNodesClient
+}
+
+func NewGetClusterNodesHandler(d *Daemon) GetClusterNodesHandler {
+	return &getNodes{
+		d:       d,
+		clients: map[int64]*clusterNodesClient{},
+	}
+}
+
+type clusterNodesClient struct {
+	lock.RWMutex
+	*models.ClusterNodeStatus
+}
+
+func (c *clusterNodesClient) NodeAdd(newNode node.Node) error {
+	c.Lock()
+	c.NodesAdded = append(c.NodesAdded, newNode.GetModel())
+	c.Unlock()
+	return nil
+}
+
+func (c *clusterNodesClient) NodeUpdate(oldNode, newNode node.Node) error {
+	c.Lock()
+	c.NodesAdded = append(c.NodesAdded, newNode.GetModel())
+	c.NodesRemoved = append(c.NodesRemoved, oldNode.GetModel())
+	c.Unlock()
+	return nil
+}
+
+func (c *clusterNodesClient) NodeDelete(node node.Node) error {
+	c.Lock()
+	// If the node was added/updated and removed before the clusterNodesClient
+	// was aware of it then we can safely remove it from the list of added
+	// nodes and not set it in the list of removed nodes.
+	found := -1
+	for i, added := range c.NodesAdded {
+		if added.Name == node.Fullname() {
+			found = i
+		}
+	}
+	if found != -1 {
+		c.NodesAdded = append(c.NodesAdded[:found], c.NodesAdded[found+1:]...)
+	} else {
+		c.NodesRemoved = append(c.NodesRemoved, node.GetModel())
+	}
+	c.Unlock()
+	return nil
+}
+
+func (c *clusterNodesClient) NodeValidateImplementation(node node.Node) error {
+	// no-op
+	return nil
+}
+
+func (c *clusterNodesClient) NodeConfigurationChanged(config datapath.LocalNodeConfiguration) error {
+	// no-op
+	return nil
+}
+
+func (h *getNodes) Handle(params GetClusterNodesParams) middleware.Responder {
+	var cns *models.ClusterNodeStatus
+	// If ClientID is not set then we send all nodes and we don't the clusterNodesClient
+	// ID in cache.
+	if params.ClientID == nil {
+		ns := h.d.getNodeStatus()
+		cns = &models.ClusterNodeStatus{
+			Self:       ns.Self,
+			NodesAdded: ns.Nodes,
+		}
+	} else {
+		h.Lock()
+		defer h.Unlock()
+		var clientID int64
+		c, exists := h.clients[*params.ClientID]
+		if exists {
+			clientID = *params.ClientID
+		} else {
+			clientID = rand.Int63()
+			c = &clusterNodesClient{
+				ClusterNodeStatus: &models.ClusterNodeStatus{
+					ClientID: clientID,
+					Self:     h.d.nodeDiscovery.LocalNode.Fullname(),
+				},
+			}
+			h.d.nodeDiscovery.Manager.Subscribe(c)
+			h.clients[clientID] = c
+		}
+		c.Lock()
+		cns = c.ClusterNodeStatus
+		c.ClusterNodeStatus = &models.ClusterNodeStatus{
+			ClientID: clientID,
+			Self:     h.d.nodeDiscovery.LocalNode.Fullname(),
+		}
+		c.Unlock()
+	}
+
+	return NewGetClusterNodesOK().WithPayload(cns)
 }
 
 // getStatus returns the daemon status. If brief is provided a minimal version
