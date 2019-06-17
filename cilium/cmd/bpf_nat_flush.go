@@ -46,7 +46,7 @@ func flushNat() {
 			err = m.Open()
 		}
 		if err != nil {
-			Fatalf("Unable to open %s: %s", path, err)
+			fmt.Printf("Unable to open %s: %s", path, err)
 			continue
 		}
 		defer m.Close()

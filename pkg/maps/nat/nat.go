@@ -22,7 +22,7 @@ import (
 	"github.com/cilium/cilium/pkg/bpf"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
-	"github.com/cilium/cilium/pkg/tuple"
+	"github.com/cilium/cilium/pkg/maps/ctmap"
 )
 
 var (
@@ -67,7 +67,7 @@ type NatEntry interface {
 	ToHost() NatEntry
 
 	// Dumps the Nat entry as string.
-	Dump(key tuple.TupleKey, start uint64) string
+	Dump(key ctmap.CtKey, start uint64) string
 }
 
 // NatDumpCreated returns time in seconds when NAT entry was created.
@@ -85,13 +85,13 @@ func NewMap(name string, v4 bool) *Map {
 	var mapValue bpf.MapValue
 
 	if v4 {
-		mapKey = &tuple.TupleKey4Global{}
-		sizeKey = int(unsafe.Sizeof(tuple.TupleKey4Global{}))
+		mapKey = &NatKey4{}
+		sizeKey = int(unsafe.Sizeof(NatKey4{}))
 		mapValue = &NatEntry4{}
 		sizeVal = int(unsafe.Sizeof(NatEntry4{}))
 	} else {
-		mapKey = &tuple.TupleKey6Global{}
-		sizeKey = int(unsafe.Sizeof(tuple.TupleKey6Global{}))
+		mapKey = &NatKey6{}
+		sizeKey = int(unsafe.Sizeof(NatKey6{}))
 		mapValue = &NatEntry6{}
 		sizeVal = int(unsafe.Sizeof(NatEntry6{}))
 	}
@@ -118,7 +118,7 @@ func (m *Map) DumpEntries() (string, error) {
 
 	nsecStart, _ := bpf.GetMtime()
 	cb := func(k bpf.MapKey, v bpf.MapValue) {
-		key := k.(tuple.TupleKey)
+		key := k.(ctmap.CtKey)
 		if !key.ToHost().Dump(&buffer, false) {
 			return
 		}
@@ -148,7 +148,7 @@ func statStartGc(m *Map) gcStats {
 func doFlush4(m *Map) gcStats {
 	stats := statStartGc(m)
 	filterCallback := func(key bpf.MapKey, _ bpf.MapValue) {
-		currentKey := key.(*tuple.TupleKey4Global)
+		currentKey := key.(*ctmap.CtKey4Global)
 		err := m.Delete(currentKey)
 		if err != nil {
 			log.WithError(err).WithField(logfields.Key, currentKey.String()).Error("Unable to delete CT entry")
@@ -163,7 +163,7 @@ func doFlush4(m *Map) gcStats {
 func doFlush6(m *Map) gcStats {
 	stats := statStartGc(m)
 	filterCallback := func(key bpf.MapKey, _ bpf.MapValue) {
-		currentKey := key.(*tuple.TupleKey6Global)
+		currentKey := key.(*ctmap.CtKey6Global)
 		err := m.Delete(currentKey)
 		if err != nil {
 			log.WithError(err).WithField(logfields.Key, currentKey.String()).Error("Unable to delete CT entry")
@@ -183,21 +183,23 @@ func (m *Map) Flush() int {
 	return int(doFlush6(m).deleted)
 }
 
-func deleteMapping4(m *Map, ctKey *tuple.TupleKey4Global) error {
-	key := *ctKey
+func deleteMapping4(m *Map, ctKey *ctmap.CtKey4Global) error {
+	key := NatKey4{
+		CtKey4Global: *ctKey,
+	}
 	// Workaround #5848.
 	addr := key.SourceAddr
 	key.SourceAddr = key.DestAddr
 	key.DestAddr = addr
 	valMap, err := m.Lookup(&key)
 	if err == nil {
-		val := *(*NatEntry4)(unsafe.Pointer(valMap.GetValuePtr()))
+		val := (*NatEntry4)(valMap.GetValuePtr())
 		rkey := key
 		rkey.SourceAddr = key.DestAddr
 		rkey.SourcePort = key.DestPort
 		rkey.DestAddr = val.Addr
 		rkey.DestPort = val.Port
-		rkey.Flags = tuple.TUPLE_F_IN
+		rkey.Flags = ctmap.TUPLE_F_IN
 
 		m.Delete(&key)
 		m.Delete(&rkey)
@@ -205,21 +207,23 @@ func deleteMapping4(m *Map, ctKey *tuple.TupleKey4Global) error {
 	return nil
 }
 
-func deleteMapping6(m *Map, ctKey *tuple.TupleKey6Global) error {
-	key := *ctKey
+func deleteMapping6(m *Map, ctKey *ctmap.CtKey6Global) error {
+	key := NatKey6{
+		CtKey6Global: *ctKey,
+	}
 	// Workaround #5848.
 	addr := key.SourceAddr
 	key.SourceAddr = key.DestAddr
 	key.DestAddr = addr
 	valMap, err := m.Lookup(&key)
 	if err == nil {
-		val := *(*NatEntry6)(unsafe.Pointer(valMap.GetValuePtr()))
+		val := (*NatEntry6)(valMap.GetValuePtr())
 		rkey := key
 		rkey.SourceAddr = key.DestAddr
 		rkey.SourcePort = key.DestPort
 		rkey.DestAddr = val.Addr
 		rkey.DestPort = val.Port
-		rkey.Flags = tuple.TUPLE_F_IN
+		rkey.Flags = ctmap.TUPLE_F_IN
 
 		m.Delete(&key)
 		m.Delete(&rkey)
@@ -228,14 +232,14 @@ func deleteMapping6(m *Map, ctKey *tuple.TupleKey6Global) error {
 }
 
 // DeleteMapping removes a NAT mapping from the global NAT table.
-func (m *Map) DeleteMapping(key tuple.TupleKey) error {
-	if key.GetFlags()&tuple.TUPLE_F_IN != 0 {
+func (m *Map) DeleteMapping(key ctmap.CtKey) error {
+	if key.GetFlags()&ctmap.TUPLE_F_IN != 0 {
 		return nil
 	}
 	if m.v4 {
-		return deleteMapping4(m, key.(*tuple.TupleKey4Global))
+		return deleteMapping4(m, key.(*ctmap.CtKey4Global))
 	}
-	return deleteMapping6(m, key.(*tuple.TupleKey6Global))
+	return deleteMapping6(m, key.(*ctmap.CtKey6Global))
 }
 
 func maps(ipv4, ipv6 bool) []*Map {

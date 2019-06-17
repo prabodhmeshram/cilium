@@ -1,4 +1,4 @@
-// Copyright 2017-2018 Authors of Cilium
+// Copyright 2017-2019 Authors of Cilium
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ import (
 
 	"github.com/cilium/cilium/common"
 	"github.com/cilium/cilium/pkg/maps/ctmap"
+	"github.com/cilium/cilium/pkg/maps/nat"
+	"github.com/cilium/cilium/pkg/option"
 
 	"github.com/spf13/cobra"
 )
@@ -42,6 +44,26 @@ func init() {
 
 type dummyEndpoint struct {
 	ID int
+}
+
+func init() {
+	natGlobalMaps := nat.GlobalMaps(true, true)
+	global4Map := natGlobalMaps[0]
+	global6Map := natGlobalMaps[1]
+
+	// SNAT also only works if the CT map is global so all local maps will be nil
+	ctmap.InitMapInfo(option.Config.CTMapEntriesGlobalTCP, option.Config.CTMapEntriesGlobalAny,
+		map[ctmap.MapType]ctmap.NatMap{
+			ctmap.MapTypeIPv4TCPLocal:  nil,
+			ctmap.MapTypeIPv6TCPLocal:  nil,
+			ctmap.MapTypeIPv4TCPGlobal: global4Map,
+			ctmap.MapTypeIPv6TCPGlobal: global6Map,
+			ctmap.MapTypeIPv4AnyLocal:  nil,
+			ctmap.MapTypeIPv6AnyLocal:  nil,
+			ctmap.MapTypeIPv4AnyGlobal: global4Map,
+			ctmap.MapTypeIPv6AnyGlobal: global6Map,
+		},
+	)
 }
 
 func (d dummyEndpoint) GetID() uint64 {

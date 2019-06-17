@@ -22,7 +22,6 @@ import (
 
 	"github.com/cilium/cilium/common/types"
 	"github.com/cilium/cilium/pkg/bpf"
-	"github.com/cilium/cilium/pkg/tuple"
 	"github.com/cilium/cilium/pkg/u8proto"
 
 	. "gopkg.in/check.v1"
@@ -44,14 +43,12 @@ func (k *CTMapTestSuite) Benchmark_MapUpdate(c *C) {
 	c.Assert(err, IsNil)
 
 	key := &CtKey4{
-		tuple.TupleKey4{
-			DestAddr:   types.IPv4{0xa, 0x10, 0xc5, 0xf0},
-			SourceAddr: types.IPv4{0xa, 0x10, 0x9d, 0xb3},
-			DestPort:   0,
-			SourcePort: 0,
-			NextHeader: u8proto.TCP,
-			Flags:      0,
-		},
+		DestAddr:   types.IPv4{0xa, 0x10, 0xc5, 0xf0},
+		SourceAddr: types.IPv4{0xa, 0x10, 0x9d, 0xb3},
+		DestPort:   0,
+		SourcePort: 0,
+		NextHeader: u8proto.TCP,
+		Flags:      0,
 	}
 	value := &CtEntry{
 		RxPackets:        4,
@@ -77,12 +74,12 @@ func (k *CTMapTestSuite) Benchmark_MapUpdate(c *C) {
 		c.Assert(err, IsNil)
 	}
 
-	a1 := make([]tuple.TupleKey, 1)
+	a1 := make([]CtKey, 1)
 	a2 := make([]*CtEntry, 1)
 
 	// Also account the cost of casting from MapKey to TupleKey
 	cb := func(k bpf.MapKey, v bpf.MapValue) {
-		key := k.(tuple.TupleKey)
+		key := k.(CtKey)
 		value := v.(*CtEntry)
 		a1[0] = key
 		a2[0] = value
