@@ -4,6 +4,8 @@
     Please use the official rendered version released here:
     http://docs.cilium.io
 
+.. _ipam_eni:
+
 #######
 AWS ENI
 #######
@@ -26,7 +28,7 @@ Architecture
 .. image:: eni_arch.png
     :align: center
 
-The AWS ENI allocator builds on top of the CRD-backed allocator. Each node a
+The AWS ENI allocator builds on top of the CRD-backed allocator. Each node
 creates a ``ciliumnodes.cilium.io`` custom resource matching the node name when
 Cilium starts up for the first time on that node. It contacts the EC2 metadata
 API to retrieve instance ID, instance type, and VPC information and populates
@@ -46,6 +48,8 @@ The selection of subnets to use for allocation as well as attachment of
 security groups to new ENIs can be controlled separately for each node. This
 makes it possible to hand out pod IPs with differing security groups on
 individual nodes.
+
+The corresponding datapath is described in section :ref:`datapath_eni`.
 
 *************
 Configuration
@@ -148,19 +152,20 @@ allocation:
 Operational Details
 *******************
 
-Cache of ENIs and Subnets
-=========================
+Cache of ENIs, Subnets, and VPCs
+================================
 
-The operator maintains a list of all EC2 ENIs and subnets associated with the
-AWS account in a cache. For this purpose, the operator performs the following
-two EC2 API operations:
+The operator maintains a list of all EC2 ENIs, VPCs and subnets associated with
+the AWS account in a cache. For this purpose, the operator performs the
+following two EC2 API operations:
 
  * ``DescribeNetworkInterfaces``
  * ``DescribeSubnets``
+ * ``DescribeVpcs``
 
 The cache is updated once per minute or after an IP allocation or ENI creation
 has been performed. When triggered based on an allocation or creation, the
-operation is performed at most once every 15 seconds.
+operation is performed at most once per second.
 
 Publication of available ENI IPs
 ================================
@@ -200,7 +205,7 @@ based scan, the allocation order of nodes is determined based on the severity
 of the deficit, i.e. the node with the biggest deficit will be at the front of
 the allocation queue.
 
-The allocation queue is handled on demand but at most every 5 seconds.
+The allocation queue is handled on demand but at most once per second.
 
 IP Allocation
 =============
@@ -297,6 +302,7 @@ perform ENI creation and IP allocation:
 
  * ``DescribeNetworkInterfaces``
  * ``DescribeSubnets``
+ * ``DescribeVpcs``
  * ``CreateNetworkInterface``
  * ``AttachNetworkInterface``
  * ``ModifyNetworkInterface``

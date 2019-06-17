@@ -24,4 +24,5 @@ required to run a full Cilium deployment.
    ipam/index
    networking
    security
+   datapath
    failure_behavior
