@@ -459,6 +459,32 @@ func RemoveProxyRules(proxyPort uint16, ingress bool, name string) error {
 	return iptProxyRules("-D", proxyPort, ingress, name)
 }
 
+func localSnatSrcAddrExclusion() string {
+	switch {
+	case option.Config.IPv4NativeRoutingCIDR() != nil:
+		return option.Config.IPv4NativeRoutingCIDR().String()
+
+	case option.Config.Tunnel == option.TunnelDisabled:
+		return node.GetIPv4ClusterRange().String()
+
+	default:
+		return node.GetHostMasqueradeIPv4().String()
+	}
+}
+
+func remoteSnatDstAddrExclusion() string {
+	switch {
+	case option.Config.IPv4NativeRoutingCIDR() != nil:
+		return option.Config.IPv4NativeRoutingCIDR().String()
+
+	case option.Config.Tunnel == option.TunnelDisabled:
+		return node.GetIPv4ClusterRange().String()
+
+	default:
+		return node.GetIPv4AllocRange().String()
+	}
+}
+
 // InstallRules installs iptables rules for Cilium in specific use-cases
 // (most specifically, interaction with kube-proxy).
 func (m *IptablesManager) InstallRules(ifName string) error {
@@ -551,16 +577,6 @@ func (m *IptablesManager) InstallRules(ifName string) error {
 		}
 
 		if option.Config.Masquerade {
-			ingressSnatSrcAddrExclusion := node.GetHostMasqueradeIPv4().String()
-			if option.Config.Tunnel == option.TunnelDisabled {
-				ingressSnatSrcAddrExclusion = node.GetIPv4ClusterRange().String()
-			}
-
-			egressSnatDstAddrExclusion := node.GetIPv4AllocRange().String()
-			if option.Config.Tunnel == option.TunnelDisabled {
-				egressSnatDstAddrExclusion = node.GetIPv4ClusterRange().String()
-			}
-
 			// Masquerade all egress traffic leaving the node
 			//
 			// This rule must be first as it has different exclusion criteria
@@ -575,15 +591,27 @@ func (m *IptablesManager) InstallRules(ifName string) error {
 			//     range
 			// * Non-tunnel mode:
 			//   * May not be targeted to an IP in the cluster range
-			if err := runProg("iptables", []string{
-				"-t", "nat",
-				"-A", ciliumPostNatChain,
-				"-s", node.GetIPv4AllocRange().String(),
-				"!", "-d", egressSnatDstAddrExclusion,
-				"!", "-o", "cilium_+",
-				"-m", "comment", "--comment", "cilium masquerade non-cluster",
-				"-j", "MASQUERADE"}, false); err != nil {
-				return err
+			if option.Config.EgressMasqueradeInterfaces != "" {
+				if err := runProg("iptables", []string{
+					"-t", "nat",
+					"-A", ciliumPostNatChain,
+					"!", "-d", remoteSnatDstAddrExclusion(),
+					"-o", option.Config.EgressMasqueradeInterfaces,
+					"-m", "comment", "--comment", "cilium masquerade non-cluster",
+					"-j", "MASQUERADE"}, false); err != nil {
+					return err
+				}
+			} else {
+				if err := runProg("iptables", []string{
+					"-t", "nat",
+					"-A", ciliumPostNatChain,
+					"-s", node.GetIPv4AllocRange().String(),
+					"!", "-d", remoteSnatDstAddrExclusion(),
+					"!", "-o", "cilium_+",
+					"-m", "comment", "--comment", "cilium masquerade non-cluster",
+					"-j", "MASQUERADE"}, false); err != nil {
+					return err
+				}
 			}
 
 			// The following rules exclude traffic from the remaining rules in this chain.
@@ -645,7 +673,7 @@ func (m *IptablesManager) InstallRules(ifName string) error {
 			if err := runProg("iptables", []string{
 				"-t", "nat",
 				"-A", ciliumPostNatChain,
-				"!", "-s", ingressSnatSrcAddrExclusion,
+				"!", "-s", localSnatSrcAddrExclusion(),
 				"!", "-d", node.GetIPv4AllocRange().String(),
 				"-m", "comment", "--comment", "cilium host->cluster masquerade",
 				"-j", "SNAT", "--to-source", node.GetHostMasqueradeIPv4().String()}, false); err != nil {
