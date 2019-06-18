@@ -32,7 +32,6 @@ import (
 	"github.com/cilium/cilium/pkg/policy"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -410,31 +409,6 @@ func RegenerateAllEndpoints(owner endpoint.Owner, regenMetadata *endpoint.Extern
 		}(ep)
 	}
 
-	return &wg
-}
-
-// RegenerateEndpointSet calls a SetStateLocked for each endpoint from the given
-// set 'epsToRegen' and if it still exists in the list of endpoints manager it
-// regenerates if state transaction is valid. During this process, the endpoint
-// list is locked and cannot be modified.
-// Returns a waiting group that can be used to know when all the endpoints are
-// regenerated.
-func RegenerateEndpointSet(owner endpoint.Owner, regenMetadata *endpoint.ExternalRegenerationMetadata, epsToRegen map[uint16]struct{}) *sync.WaitGroup {
-	mutex.RLock()
-	defer mutex.RUnlock()
-
-	var wg sync.WaitGroup
-	log.WithFields(logrus.Fields{"endpoints": epsToRegen}).Infof("regenerating some endpoints due to %s", regenMetadata.Reason)
-	for epID := range epsToRegen {
-		ep := endpoints[epID]
-		if ep != nil {
-			wg.Add(1)
-			go func(ep *endpoint.Endpoint) {
-				ep.RegenerateSync(owner, regenMetadata)
-				wg.Done()
-			}(ep)
-		}
-	}
 	return &wg
 }
 
