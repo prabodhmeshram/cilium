@@ -453,9 +453,10 @@ func (d *Daemon) ReactToRuleUpdates(wg *sync.WaitGroup, epsToBumpRevision *polic
 
 	epsToRegen.Mutex.RLock()
 	// Regenerate all other endpoints.
-	endpointmanager.RegenerateEndpointSetSignalWhenEnqueued(d, &endpoint.ExternalRegenerationMetadata{Reason: "policy rules added"}, epsToRegen.IDs, &enqueueWaitGroup)
+	endpointRegen := endpointmanager.RegenerateEndpointSet(d, &endpoint.ExternalRegenerationMetadata{Reason: "policy rules added"}, epsToRegen.IDs)
 	epsToRegen.Mutex.RUnlock()
 
+	endpointRegen.Wait()
 	enqueueWaitGroup.Wait()
 }
 

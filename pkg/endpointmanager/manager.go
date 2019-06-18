@@ -32,6 +32,7 @@ import (
 	"github.com/cilium/cilium/pkg/policy"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -412,23 +413,29 @@ func RegenerateAllEndpoints(owner endpoint.Owner, regenMetadata *endpoint.Extern
 	return &wg
 }
 
-// RegenerateEndpointSetSignalWhenEnqueued regenerates the endpoints represented
-// by endpointIDs. It signals to the provided WaitGroup when all of the endpoints
-// in said set have had regenerations queued up.
-func RegenerateEndpointSetSignalWhenEnqueued(owner endpoint.Owner, regenMetadata *endpoint.ExternalRegenerationMetadata, endpointIDs map[uint16]struct{}, wg *sync.WaitGroup) {
+// RegenerateEndpointSet calls a SetStateLocked for each endpoint from the given
+// set 'epsToRegen' and if it still exists in the list of endpoints manager it
+// regenerates if state transaction is valid. During this process, the endpoint
+// list is locked and cannot be modified.
+// Returns a waiting group that can be used to know when all the endpoints are
+// regenerated.
+func RegenerateEndpointSet(owner endpoint.Owner, regenMetadata *endpoint.ExternalRegenerationMetadata, epsToRegen map[uint16]struct{}) *sync.WaitGroup {
+	mutex.RLock()
+	defer mutex.RUnlock()
 
-	for endpointID := range endpointIDs {
-		ep := endpoints[endpointID]
-		if ep == nil {
-			log.WithField(logfields.EndpointID, endpointID).Error("Enqueued regenerate for non-existent Endpoint")
-			continue
+	var wg sync.WaitGroup
+	log.WithFields(logrus.Fields{"endpoints": epsToRegen}).Infof("regenerating some endpoints due to %s", regenMetadata.Reason)
+	for epID := range epsToRegen {
+		ep := endpoints[epID]
+		if ep != nil {
+			wg.Add(1)
+			go func(ep *endpoint.Endpoint) {
+				ep.RegenerateSync(owner, regenMetadata)
+				wg.Done()
+			}(ep)
 		}
-		wg.Add(1)
-		go func(ep *endpoint.Endpoint) {
-			ep.RegenerateASync(owner, regenMetadata)
-			wg.Done()
-		}(ep)
 	}
+	return &wg
 }
 
 // HasGlobalCT returns true if the endpoints have a global CT, false otherwise.
