@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package endpoint
+package regeneration
 
 import (
 	"context"
@@ -23,6 +23,7 @@ import (
 	"github.com/cilium/cilium/pkg/lock"
 	monitorAPI "github.com/cilium/cilium/pkg/monitor/api"
 	"github.com/cilium/cilium/pkg/policy"
+	"github.com/cilium/cilium/pkg/proxy/logger"
 	"github.com/cilium/cilium/pkg/revert"
 )
 
@@ -33,19 +34,19 @@ type Owner interface {
 	GetPolicyRepository() *policy.Repository
 
 	// UpdateProxyRedirect must update the redirect configuration of an endpoint in the proxy
-	UpdateProxyRedirect(e *Endpoint, l4 *policy.L4Filter, proxyWaitGroup *completion.WaitGroup) (uint16, error, revert.FinalizeFunc, revert.RevertFunc)
+	UpdateProxyRedirect(e logger.EndpointUpdater, l4 *policy.L4Filter, proxyWaitGroup *completion.WaitGroup) (uint16, error, revert.FinalizeFunc, revert.RevertFunc)
 
 	// RemoveProxyRedirect must remove the redirect installed by UpdateProxyRedirect
-	RemoveProxyRedirect(e *Endpoint, id string, proxyWaitGroup *completion.WaitGroup) (error, revert.FinalizeFunc, revert.RevertFunc)
+	RemoveProxyRedirect(e logger.EndpointInfoSource, id string, proxyWaitGroup *completion.WaitGroup) (error, revert.FinalizeFunc, revert.RevertFunc)
 
 	// UpdateNetworkPolicy adds or updates a network policy in the set
 	// published to L7 proxies.
-	UpdateNetworkPolicy(e *Endpoint, policy *policy.L4Policy,
+	UpdateNetworkPolicy(e logger.EndpointUpdater, policy *policy.L4Policy,
 		proxyWaitGroup *completion.WaitGroup) (error, revert.RevertFunc)
 
 	// RemoveNetworkPolicy removes a network policy from the set published to
 	// L7 proxies.
-	RemoveNetworkPolicy(e *Endpoint)
+	RemoveNetworkPolicy(e logger.EndpointInfoSource)
 
 	// QueueEndpointBuild puts the given endpoint in the processing queue
 	QueueEndpointBuild(ctx context.Context, epID uint64) (func(), error)
